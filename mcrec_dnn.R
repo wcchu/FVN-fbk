@@ -1,81 +1,87 @@
+suppressPackageStartupMessages(library(data.table))
+suppressPackageStartupMessages(library(dplyr))
+suppressPackageStartupMessages(library(dtplyr))
+select <- dplyr::select
 # Input:
 #   dvar = predictor variables of the reference set
 #   dcls = a vector of classes corresponding to dvar. has to be in type Factor.
-#   dfbk = a vector of feedbacks corresponding to dvar (== T means positive response)
+#   dfbk = a vector of feedbacks corresponding to dvar (== T means pos_fbk response)
 #   dquery = predictor variables of the query dataset
 #   radius = normalized radius of the neighborhood in variable space
-#   min.frac = minimun fraction of the points in a class to the total number of points
-#              in the neighborhood so that this class is a candidate class to be
-#              recommended
-#   min.cls = minimun number of the points in a class in the neighborhood so that this
-#             class is a candidate class to be recommended
-#   op = 'rate' recommends the class with the highest rate of positive == T
-#        'popularity' recommends the class with the most points of positive == T
-# Output: recommended sizes (vector)
-NN <- function(dvar, dcls, dfbk, dquery, radius, min.frac, min.cls, op) {
-  # * process training data to create "reference data" for NN alg
-  dref <- data.frame(dvar, class = dcls, positive = dfbk)
-  nvar <- ncol(dvar) # number of variables
-  nref <- nrow(dvar) # number of reference points
+#   keyval = 'rate' (default) rate of success for each class
+#            'popularity' proportion of success points in each class to total success points
+#   conf.lev = the confidence level for calculating the confidence interval of keyval
+# Output: a dataframe with qid (query id), class, and for each class, n_evnets, n_success,
+#         upper bound, lower bound, average of keyval
+NN <- function(dvar, dcls, dfbk, dquery, radius, keyval = "rate", conf.lev = 0.95) {
+  ## quarantee dvar and dquery are data frames and dcls and dfbk are vectors
+  dvar <- data.frame(dvar)
+  dquery <- data.frame(dquery)
+  if (is.data.frame(dcls)) {dcls <- dcls[, 1]}
+  if (is.data.frame(dfbk)) {dfbk <- dfbk[, 1]}
+  ## Combine variables, class, and feedback to form "reference dataset" for NN alg
+  dref <- data.frame(dvar, class = dcls, success = dfbk)
+  nvar <- ncol(dvar)
+  nref <- nrow(dref) # number of reference points
   lcls <- unique(dcls) # list of classes
   ncls <- length(lcls) # number of classes
   u <- c()
   for (icls in 1:ncls) {
-    d_cls <- dref %>% filter(class == lcls[icls])
+    d_cls <- dref %>% filter(class == lcls[icls]) ## subset of dref in this class
     uvar <- c()
     for (ivar in 1:nvar) {
-      uvar[ivar] <- sd(d_cls[, ivar])
+      uvar[ivar] <- sd(d_cls[, ivar]) ## uvar is a list of standard variations of each variable
     }
     u <- rbind(u, data.frame(t(uvar), class = lcls[icls]))
   }
-  # dcls
-  c <- data.frame(class = dcls)
-  # a dataset with the same dims as dvar to record units
-  dunt <-
-    left_join(c, u, by = c("class" = "class")) %>%
-    select(-class)
   # run through queries and recommend size for each query
-  nq <- nrow(dquery)
-  rcls <- factor(levels = levels(dcls))
-  rscr <- c()
-  #drec <- c()
-  for (iq in 1:nq) {
+  dprob <- c()
+  for (iq in 1:nrow(dquery)) {
     q <- dquery[iq, ]
     ss <- vector(length = nref)
-    for (ivar in 1:nvar) {
-      ss <- ss + ((dvar[, ivar] - as.numeric(q[ivar])) / dunt[, ivar])^2
+    for (iref in 1:nref) {
+      cls0 <- dref$class[iref]
+      if (max(abs(q - dref[iref, c(1:nvar)]) / u[u$class == cls0, c(1:nvar)]) > radius) {
+        ## If in any dimension the distance from the query q to the ref in dref is
+        ## longer than radius, remove this ref
+        ss[iref] <- NA
+      } else {
+        ss[iref] <- 0.0 ## ss records the distances from the query q to each ref in dref
+        for (ivar in 1:nvar) {
+          ss[iref] <- ss[iref] + ((dref[iref, ivar] - as.numeric(q[ivar])) / u[u$class == cls0, ivar])^2
+        }
+      }
     }
-    distance <- sqrt(ss)
-    dref$dist <- distance
     # collect data points in ball
     dball <-
       dref %>%
+      mutate(dist = sqrt(ss)) %>%
+      filter(!is.na(dist)) %>%
       filter(dist <= radius) %>%
-      select(class, positive)
-    n_total = nrow(dball)
+      select(class, success)
     # do statistics in ball
     sball <-
       dball %>%
       group_by(class) %>%
-      summarise(n_cls = n(), n_pos = sum(ifelse(positive == T, 1, 0))) %>%
-      mutate(
-        n = n_total,
-        frac = n_cls / n_total,
-        n_neg = n_cls - n_pos,
-        neg_rate = n_neg / n_cls
-      ) %>%
-      filter(frac >= min.frac, n_cls >= min.cls, n_cls > 1) %>%
-      data.frame()
-    if (op == 'rate') {
-      theclass = arrange(sball, neg_rate)$class[1]
-      thescore = arrange(sball, neg_rate)$neg_rate[1]
+      summarise(n_events = n(), n_success = sum(ifelse(success == T, 1, 0))) %>%
+      data.frame() %>%
+      right_join(data.frame(class = lcls), by = "class") %>%
+      mutate(n_events = ifelse(is.na(n_events), 0, n_events),
+             n_success = ifelse(is.na(n_success), 0, n_success),
+             upp = NA, low = NA, ave = NA)
+    for (ic in 1:nrow(sball)) {
+      if (sball$n_events[ic] > 0) { ## this class has data points in the query-ball
+        if (keyval == 'popularity') {
+          t <- binom.test(sball$n_success[ic], sum(sball$n_success), conf.level = conf.lev)
+        } else if (keyval == 'rate') {
+          t <- binom.test(sball$n_success[ic], sball$n_events[ic], conf.level = conf.lev)
+        }
+        sball$upp[ic] <- round(t$conf.int[2], 3)
+        sball$low[ic] <- round(t$conf.int[1], 3)
+        sball$ave[ic] <- round(t$est, 3)
+      }
     }
-    if (op == 'popularity') {
-      theclass = arrange(sball, desc(n_pos))$class[1]
-      thescore = arrange(sball, desc(n_pos))$n_pos[1]
-    }
-    rcls[iq] <- theclass
-    rscr[iq] <- thescore
+    dprob <- rbind(dprob, merge(data.frame(qid = iq), sball))
   }
-  return(data.frame(cls = rcls, scr = rscr))
+  return(dprob)
 }
