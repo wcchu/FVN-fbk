@@ -1,4 +1,4 @@
-# Multiclass recommender based on binary feedback
+# Fixed-volume neighborhood classifier with binary feedback
 
 Nature of the problem:
 Suppose we have n numerical (predictor) variables Vp = [V1, ... Vn], 1 categorial variable Vc, and a binary response R. When given a query with Vp, which category in Vc do we choose to "optimize" the response?
