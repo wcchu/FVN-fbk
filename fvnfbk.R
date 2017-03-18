@@ -13,7 +13,7 @@ select <- dplyr::select
 #   conf.lev = the confidence level for calculating the confidence interval of keyval
 # Output: a dataframe with qid (query id), class, and for each class, n_evnets, n_success,
 #         upper bound, lower bound, average of keyval
-NN <- function(dvar, dcls, dfbk, dquery, radius, keyval = "rate", conf.lev = 0.95) {
+fvnfbk <- function(dvar, dcls, dfbk, dquery, radius, keyval = "rate", conf.lev = 0.95) {
   ## quarantee dvar and dquery are data frames and dcls and dfbk are vectors
   dvar <- data.frame(dvar)
   dquery <- data.frame(dquery)
