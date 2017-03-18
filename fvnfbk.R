@@ -15,24 +15,23 @@ select <- dplyr::select
 #         upper bound, lower bound, average of keyval
 fvnfbk <- function(dvar, dcls, dfbk, dquery, radius, keyval = "rate", conf.lev = 0.95) {
   ## quarantee dvar and dquery are data frames and dcls and dfbk are vectors
-  dvar <- data.frame(dvar)
-  dquery <- data.frame(dquery)
+  dvar <- data.table(dvar)
+  dquery <- data.table(dquery)
   if (is.data.frame(dcls)) {dcls <- dcls[, 1]}
   if (is.data.frame(dfbk)) {dfbk <- dfbk[, 1]}
   ## Combine variables, class, and feedback to form "reference dataset" for NN alg
-  dref <- data.frame(dvar, class = dcls, success = dfbk)
+  dref <- data.table(dvar, class = dcls, success = dfbk)
   nvar <- ncol(dvar)
   nref <- nrow(dref) # number of reference points
   lcls <- unique(dcls) # list of classes
-  ncls <- length(lcls) # number of classes
-  u <- c()
-  for (icls in 1:ncls) {
-    d_cls <- dref %>% filter(class == lcls[icls]) ## subset of dref in this class
-    uvar <- c()
+  #ncls <- length(lcls) # number of classes
+  u <- list()
+  for (cls in lcls) {
+    dref_cls <- dref[dref$class == cls, ] ## subset of dref in this class
+    u[[cls]] <- c()
     for (ivar in 1:nvar) {
-      uvar[ivar] <- sd(d_cls[, ivar]) ## uvar is a list of standard variations of each variable
+      u[[cls]][ivar] <- sd(dref_cls[[ivar]]) ## uvar is a list of standard variations of each variable
     }
-    u <- rbind(u, data.frame(t(uvar), class = lcls[icls]))
   }
   # run through queries and recommend size for each query
   dprob <- c()
@@ -40,15 +39,15 @@ fvnfbk <- function(dvar, dcls, dfbk, dquery, radius, keyval = "rate", conf.lev =
     q <- dquery[iq, ]
     ss <- vector(length = nref)
     for (iref in 1:nref) {
-      cls0 <- dref$class[iref]
-      if (max(abs(q - dref[iref, c(1:nvar)]) / u[u$class == cls0, c(1:nvar)]) > radius) {
+      cls <- dref$class[iref]
+      if (max(abs(q - dref[iref, c(1:nvar)]) / u[[cls]]) > radius) {
         ## If in any dimension the distance from the query q to the ref in dref is
         ## longer than radius, remove this ref
         ss[iref] <- NA
       } else {
         ss[iref] <- 0.0 ## ss records the distances from the query q to each ref in dref
         for (ivar in 1:nvar) {
-          ss[iref] <- ss[iref] + ((dref[iref, ivar] - as.numeric(q[ivar])) / u[u$class == cls0, ivar])^2
+          ss[iref] <- ss[iref] + ((dref[iref, ivar] - as.numeric(q[ivar])) / u[[cls]][ivar])^2
         }
       }
     }
