@@ -27,13 +27,16 @@ fvnfbk <- function(dvar, dcls, dfbk, dquery, radius, keyval = "rate", conf.lev =
   #ncls <- length(lcls) # number of classes
   u <- list()
   href <- list()
+  hque <- list()
   for (cls in lcls) {
     dref_cls <- dref[dref$class == cls, ] ## subset of dref in this class
     u[[cls]] <- vector(length = nvar)
     href[[cls]] <- dref_cls
+    hque[[cls]] <- dquery
     for (ivar in 1:nvar) {
-      u[[cls]][ivar] <- sd(dref_cls[[ivar]]) ## uvar is a list of standard variations of each variable
+      u[[cls]][ivar] <- sd(dref_cls[[ivar]])
       href[[cls]][[ivar]] <- dref_cls[[ivar]]/u[[cls]][ivar]
+      hque[[cls]][[ivar]] <- dquery[[ivar]]/u[[cls]][ivar]
     }
   }
   # run through queries and recommend size for each query
