@@ -23,4 +23,5 @@ p <- fvnfbk(dvar = ref[, c("Horsepower", "Passengers")],
             dquery = que[, c("Horsepower", "Passengers")],
             radius = 0.5,
             keyval = "rate",
-            conf.lev = 0.95)
+            conf.lev = 0.95,
+            k.fnn = 10)

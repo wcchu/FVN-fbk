@@ -1,6 +1,7 @@
 suppressPackageStartupMessages(library(data.table))
 suppressPackageStartupMessages(library(dplyr))
 suppressPackageStartupMessages(library(dtplyr))
+suppressPackageStartupMessages(library(FNN))
 select <- dplyr::select
 # Input:
 #   dvar = predictor variables of the reference set
@@ -13,7 +14,8 @@ select <- dplyr::select
 #   conf.lev = the confidence level for calculating the confidence interval of keyval
 # Output: a dataframe with qid (query id), class, and for each class, n_evnets, n_success,
 #         upper bound, lower bound, average of keyval
-fvnfbk <- function(dvar, dcls, dfbk, dquery, radius, keyval = "rate", conf.lev = 0.95) {
+fvnfbk <- function(dvar, dcls, dfbk, dquery, radius, keyval = "rate", conf.lev = 0.95,
+                   k.fnn = 0) {
   ## quarantee dvar and dquery are data frames and dcls and dfbk are vectors
   dvar <- data.table(dvar)
   dquery <- data.table(dquery)
@@ -42,28 +44,18 @@ fvnfbk <- function(dvar, dcls, dfbk, dquery, radius, keyval = "rate", conf.lev =
   # run through queries and recommend size for each query
   dprob <- c()
   for (iq in 1:nrow(dquery)) {
-    q <- dquery[iq, ]
-    ss <- vector(length = nref)
-    for (iref in 1:nref) {
-      cls <- dref$class[iref]
-      if (max(abs(q - dref[iref, c(1:nvar)]) / u[[cls]]) > radius) {
-        ## If in any dimension the distance from the query q to the ref in dref is
-        ## longer than radius, remove this ref
-        ss[iref] <- NA
-      } else {
-        ss[iref] <- 0.0 ## ss records the distances from the query q to each ref in dref
-        for (ivar in 1:nvar) {
-          ss[iref] <- ss[iref] + ((dref[iref, ivar] - as.numeric(q[ivar])) / u[[cls]][ivar])^2
-        }
-      }
-    }
     # collect data points in ball
-    dball <-
-      dref %>%
-      mutate(dist = sqrt(ss)) %>%
-      filter(!is.na(dist)) %>%
-      filter(dist <= radius) %>%
-      select(class, success)
+    dball <- c()
+    for (cls in lcls) {
+      k0 <- ifelse(k.fnn == 0, nrow(href[[cls]]), min(k.fnn, nrow(href[[cls]])))
+      pts <- get.knnx(data = href[[cls]][, c(1:nvar), with = FALSE],
+                      query = hque[[cls]][iq],
+                      k = k0)
+      dball <- rbind(
+        dball,
+        href[[cls]][pts$nn.index[which(pts$nn.dist <= radius)]][, c("class", "success")]
+      )
+    }
     # do statistics in ball
     sball <-
       dball %>%
