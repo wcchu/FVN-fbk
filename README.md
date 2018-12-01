@@ -8,10 +8,10 @@ Consider the record of customers watching movies in a theater. We know the basic
 
 (1) Fixed-volume-neighborhood approach
 
-All predictor variables Vp are numeric so the distance-based algorithm is valid. A fixed-volume in the variable space is defined instead of a fixed number of neighbors so that the highly sparse areas are without recommendation.
+All predictor variables Vp are numeric so the distance-based algorithm is valid. While kNN finds k nearest neighbors, we instead find all the data points within a fixed-volume in the variable space, so that the highly sparse areas are without recommendation.
 
 About the "positive feedback":
-While the goal is to let the feedback be as positive as possible, there are 2 different approaches--1. choose the genre that will give the highest positive-feedback-rate, 2. choose the genre that will give the most positive-feedback customers.
+While the goal is to let the feedback be as positive as possible, there are 2 different sub approaches--1. choose the genre that will give the highest positive-feedback-rate, 2. choose the genre that will give as many positive-feedback customers as possible.
 
 (2) Binary probablity approach
 
