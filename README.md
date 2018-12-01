@@ -4,7 +4,7 @@ Nature of the problem:
 Suppose we have n numerical (predictor) variables Vp = [V1, ... Vn], 1 categorial variable Vc, and a binary response R. When given a query with Vp, which category in Vc do we choose to "optimize" the response?
 
 Example 1:
-Consider the record of customers watching movies in a theater. We know the basic customer info: age, distance from theater, monthly movie budget etc; we know the environmental data: outdoor temporature, economic index etc; we know the movie genre; and we know the feedback after the movie to be positive or negative. For a given set of customer and environmental data Vp, what genre Vc do we recommend to get a positive feedback (R = 1)?
+Consider the record of customers watching movies in a theater. We know the basic customer info: age, distance from theater, monthly movie budget etc; we know the environmental data: outdoor temperature, economic index etc; we know the movie genre; and we know the feedback after the movie to be positive or negative. For a given set of customer and environmental data Vp, what genre Vc do we recommend to get a positive feedback (R = 1)?
 
 (1) Fixed-volume-neighborhood approach
 
